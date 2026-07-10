@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "GlobalSolve": {
+      "title": "Global Solve",
+      "description": "A speedcubing solve record shared globally.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "timeMs": { "type": "number" },
+        "scramble": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "timeMs", "scramble", "date"]
+    }
+  },
+  "firestore": {
+    "/globalSolves/{solveId}": {
+      "schema": "GlobalSolve",
+      "description": "Collection of global solve records."
+    }
+  }
+}

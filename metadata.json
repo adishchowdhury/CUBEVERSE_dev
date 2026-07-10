@@ -1,0 +1,8 @@
+{
+  "name": "CUBEVERSE",
+  "description": "The Most Beautiful Speedcubing Experience Ever Built.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
