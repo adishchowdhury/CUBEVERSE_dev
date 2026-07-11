@@ -41,7 +41,7 @@ function getAI() {
   return ai;
 }
 
-async function startServer() {
+async function createServer() {
   const app = express();
   const PORT = 3000;
 
@@ -160,9 +160,21 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  return app;
+}
+
+// For local development and Cloud Run
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  createServer().then(app => {
+    const PORT = parseInt(process.env.PORT || "3000", 10);
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
   });
 }
 
-startServer();
+// For Vercel serverless functions
+export default async (req: any, res: any) => {
+  const app = await createServer();
+  return app(req, res);
+};
