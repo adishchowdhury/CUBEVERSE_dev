@@ -173,8 +173,11 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   });
 }
 
-// For Vercel serverless functions
-export default async (req: any, res: any) => {
+// For Vercel and Netlify serverless functions
+const handler = async (req: any, res: any) => {
   const app = await createServer();
   return app(req, res);
 };
+
+export { createServer, handler };
+export default handler;
