@@ -1,4 +1,4 @@
-Live deployment-- https://cubeverse-dev-adis-projects-7ee5fbf7.vercel.app/
+Live deployment-- https://cubeverse-dev.vercel.app/
 
 ## Run Locally
 
