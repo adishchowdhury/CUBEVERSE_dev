@@ -1,9 +1,10 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { GoogleGenAI } from '@google/genai';
 import * as dotenv from 'dotenv';
+import snowflakePkg from 'snowflake-sdk';
+const snowflake = (snowflakePkg as any).default || snowflakePkg;
 import { PassThrough } from 'stream';
 
 dotenv.config();
@@ -22,6 +23,7 @@ function getElevenLabs() {
 }
 
 let ai: GoogleGenAI | null = null;
+let snowflakeConnection: any = null;
 
 function getAI() {
   if (!ai) {
@@ -39,6 +41,21 @@ function getAI() {
     });
   }
   return ai;
+}
+
+function getSnowflake() {
+  if (!snowflakeConnection) {
+    snowflakeConnection = snowflake.createConnection({
+      account: process.env.SNOWFLAKE_ACCOUNT || '',
+      username: process.env.SNOWFLAKE_USERNAME || '',
+      password: process.env.SNOWFLAKE_PASSWORD || '',
+      warehouse: process.env.SNOWFLAKE_WAREHOUSE || '',
+      database: process.env.SNOWFLAKE_DATABASE || '',
+      schema: process.env.SNOWFLAKE_SCHEMA || '',
+      role: process.env.SNOWFLAKE_ROLE || '',
+    });
+  }
+  return snowflakeConnection;
 }
 
 async function createServer() {
@@ -145,8 +162,107 @@ async function createServer() {
     }
   });
 
+  app.get('/api/analytics/global', async (req, res) => {
+    try {
+        const hasSnowflake = process.env.SNOWFLAKE_ACCOUNT && process.env.SNOWFLAKE_USERNAME;
+        
+        const demoData = {
+            source: 'demo_fallback',
+            stats: {
+                total_solves: 124500,
+                avg_tps: 8.42,
+                global_avg_time: 14.22,
+                top_method: 'CFOP (Advanced)',
+                active_cubers: 1240,
+                neural_optimization_score: 94
+            }
+        };
+
+        if (!hasSnowflake) {
+            return res.json(demoData);
+        }
+
+        const connection = getSnowflake();
+        
+        // Only connect if not already active
+        if (!connection.isUp()) {
+            try {
+                await new Promise((resolve, reject) => {
+                    connection.connect((err, conn) => {
+                        if (err) {
+                            if (err.message && err.message.includes('Already connected')) {
+                                resolve(conn);
+                            } else {
+                                reject(err);
+                            }
+                        } else {
+                            resolve(conn);
+                        }
+                    });
+                });
+            } catch (connErr: any) {
+                if (!connErr.message.includes('Already connected')) {
+                    throw connErr;
+                }
+            }
+        }
+
+        // Try to fetch real stats, fallback to a "ping" check if table doesn't exist
+        let results: any[] = [];
+        try {
+            results = await new Promise((resolve, reject) => {
+                connection.execute({
+                    sqlText: 'SELECT * FROM GLOBAL_SOLVE_STATS ORDER BY RECORD_DATE DESC LIMIT 1',
+                    complete: (err, stmt, rows) => {
+                        if (err) reject(err);
+                        else resolve(rows || []);
+                    }
+                });
+            });
+        } catch (sqlErr: any) {
+            console.log("Analytics table not found, verifying connection via version check...");
+            // Verify connection is alive even if table is missing
+            await new Promise((resolve, reject) => {
+                connection.execute({
+                    sqlText: 'SELECT CURRENT_VERSION()',
+                    complete: (err) => err ? reject(err) : resolve(true)
+                });
+            });
+            return res.json(demoData);
+        }
+
+        if (!results || results.length === 0) {
+            return res.json(demoData);
+        }
+
+        res.json({
+            source: 'snowflake_snowpark',
+            data: results[0] || {}
+        });
+
+    } catch (err: any) {
+        console.error("Snowflake Error:", err);
+        
+        // If it's a SQL error (like table not found) or connection issue, 
+        // fall back to demo data instead of crashing the UI
+        res.json({
+            source: 'demo_fallback',
+            error: err.message,
+            stats: {
+                total_solves: 124500,
+                avg_tps: 8.42,
+                global_avg_time: 14.22,
+                top_method: 'CFOP (Advanced)',
+                active_cubers: 1240,
+                neural_optimization_score: 94
+            }
+        });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -164,12 +280,18 @@ async function createServer() {
 }
 
 // For local development and Cloud Run
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+const isServerless = process.env.VERCEL || process.env.NETLIFY || process.env.FUNCTIONS_EMULATOR;
+
+if (process.env.NODE_ENV !== 'production' || !isServerless) {
   createServer().then(app => {
-    const PORT = parseInt(process.env.PORT || "3000", 10);
+    const port = process.env.PORT || "3000";
+    const PORT = parseInt(port, 10);
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
+  }).catch(err => {
+    console.error("CRITICAL: Failed to start server:", err);
+    process.exit(1);
   });
 }
 

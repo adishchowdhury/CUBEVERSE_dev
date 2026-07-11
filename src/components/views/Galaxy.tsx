@@ -1,6 +1,7 @@
 import { Solve } from '../../App';
 import { motion } from 'motion/react';
 import { useCubeStore } from '../../store';
+import { GlobalAnalytics } from '../GlobalAnalytics';
 
 export function Galaxy({ solves }: { solves: Solve[] }) {
   const achievements = useCubeStore(s => s.achievements);
@@ -69,6 +70,8 @@ export function Galaxy({ solves }: { solves: Solve[] }) {
             </div>
           </div>
         </div>
+
+        <GlobalAnalytics />
       </div>
     </div>
   );
