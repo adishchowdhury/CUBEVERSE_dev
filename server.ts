@@ -104,27 +104,35 @@ async function createServer() {
 
   app.post('/api/chat', async (req, res) => {
     try {
-        const { prompt } = req.body;
+        const { prompt, history = [] } = req.body;
         const ai = getAI();
-        const interaction = await ai.interactions.create({
-            model: "gemini-3.5-flash",
-            input: `You are the Cubeverse Neural Coach, an elite speedcubing expert. 
-            CRITICAL: Start every single response with a unique, high-energy motivational quote or encouragement for a speedcuber (e.g., about breaking PB, mastering algorithms, or staying consistent). 
-            Then, provide concise, professional, and helpful insights on CFOP/Roux methods, scramble analysis, or cubing history.
-            
-            User request: ${prompt}`,
+        
+        // Format history for @google/genai SDK
+        const formattedContents = [
+          ...history.map((msg: any) => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text }]
+          })),
+          // Ensure the latest prompt is included if not already at the end of history
+          ...(history.length === 0 || history[history.length - 1].text !== prompt ? [{
+            role: 'user',
+            parts: [{ text: prompt }]
+          }] : [])
+        ];
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: formattedContents,
+            config: {
+                systemInstruction: `You are the Cubeverse Neural Coach, an elite speedcubing expert. 
+                Keep your responses natural, conversational, energetic, and highly concise (strictly under 3 sentences where possible) because they are designed to be converted into speech via ElevenLabs.
+                CRITICAL: Never use markdown formatting like asterisks (** or *), hashes, bullet points, or numbered lists in your output as they disrupt the voice engine. 
+                Do NOT start every message with a generic greeting, repetitive motivational quote, or boilerplate welcoming. Jump straight into the helpful, dynamic, and elite advice or discussion.`
+            }
         });
         
-        let fullOutput = "";
-        for (const step of (interaction as any).steps) {
-            if (step.type === 'model_output') {
-                const textContent = step.content?.find((c: any) => c.type === 'text');
-                if (textContent && textContent.text) {
-                    fullOutput += textContent.text;
-                }
-            }
-        }
-        res.json({ text: fullOutput || "I was unable to generate a response. Please try again." });
+        const textOutput = response.text || "I was unable to generate a response. Please try again.";
+        res.json({ text: textOutput });
     } catch (err: any) {
         console.error("Gemini Error:", err);
         res.status(500).json({ 

@@ -468,7 +468,8 @@ export function AICoach() {
       timestamp: new Date()
     };
     
-    setMessages(prev => [...prev, userMessage]);
+    const currentHistory = [...messages, userMessage];
+    setMessages(currentHistory);
     setInputText('');
     setIsLoading(true);
     setTranscript("Analyzing neural parameters...");
@@ -477,7 +478,13 @@ export function AICoach() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: trimmed }),
+        body: JSON.stringify({ 
+          prompt: trimmed,
+          history: currentHistory.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            text: msg.text
+          }))
+        }),
       });
 
       if (!response.ok) {
