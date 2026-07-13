@@ -29,8 +29,8 @@ export function Library() {
   };
 
   return (
-    <div className="w-full h-full p-6 md:p-12 lg:p-16 z-10 pointer-events-none flex flex-col">
-      <div className="flex justify-between items-end mb-8">
+    <div className="w-full relative pointer-events-none flex flex-col gap-6 p-4 md:p-8 pb-12">
+      <div className="flex justify-between items-end mb-4 pointer-events-auto">
         <div>
           <h2 className="font-display text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">
             Algorithm <span className="neon-text-g">Forge</span>
@@ -39,7 +39,7 @@ export function Library() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-20 scrollbar-hide pointer-events-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pointer-events-auto">
         {ALGORITHMS.map(algo => (
           <div 
             key={algo.id} 

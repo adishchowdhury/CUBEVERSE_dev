@@ -1,4 +1,5 @@
 import { useRef, useMemo, useImperativeHandle, forwardRef, useState, useEffect } from 'react';
+import { useCubeStore } from '../store';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoundedBox } from '@react-three/drei';
@@ -261,6 +262,9 @@ export const Cube = forwardRef<CubeRef, { isHovered?: boolean, isRunning?: boole
 
     if (!currentMove.current && queue.current.length > 0) {
       let moveStr = queue.current.shift()!;
+      if (isRunning) {
+        useCubeStore.getState().incrementSolveMovesCount();
+      }
       let speedMultiplier = 1;
       if (moveStr.includes("FAST")) {
         speedMultiplier = 4;

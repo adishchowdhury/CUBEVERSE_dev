@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Scene } from './components/Scene';
 import { Overlay } from './components/Overlay';
-import { Chatbot } from './components/Chatbot';
 import { MusicPlayer } from './components/MusicPlayer';
+import { ShaderBackground } from './components/ShaderBackground';
+import { LiquidCursor } from './components/LiquidCursor';
 
-export type ViewState = 'home' | 'nexus' | 'library' | 'galaxy';
+export type ViewState = 'home' | 'nexus' | 'library' | 'galaxy' | 'ai-coach';
 
 export interface Solve {
   id: string;
@@ -21,6 +22,7 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-screen bg-[#050505] overflow-hidden">
+      <ShaderBackground />
       <Scene isHovered={isHovered} isRunning={isRunning} view={view} />
       <Overlay 
         view={view}
@@ -32,8 +34,8 @@ export default function App() {
         onHoverEnter={() => setIsHovered(true)} 
         onHoverLeave={() => setIsHovered(false)}
       />
-      <Chatbot />
       <MusicPlayer />
+      <LiquidCursor />
     </div>
   );
 }

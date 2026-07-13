@@ -29,6 +29,7 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
   const startTimeRef = useRef<number>(0);
   const timerTextRef = useRef<HTMLDivElement>(null);
   const finalTimeRef = useRef<number>(0);
+  const frameCounterRef = useRef<number>(0);
 
   // Auth listener
   useEffect(() => {
@@ -102,26 +103,32 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
           timerTextRef.current.innerText = formatTime(elapsed);
         }
         
-        // Check for completion
-        const latestCube = useCubeStore.getState().cubeRef;
-        const latestScramble = useCubeStore.getState().currentScramble;
-        if (elapsed > 500 && latestCube?.isSolved()) {
-          const finalElapsed = performance.now() - startTimeRef.current;
-          setIsRunning(false);
-          const solveData = {
-            id: Math.random().toString(),
-            timeMs: finalElapsed,
-            date: new Date(),
-            scramble: latestScramble
-          };
-          setSolves(prev => [solveData, ...prev]);
-          saveSolveToFirebase(finalElapsed, latestScramble);
+        // Throttled check for completion to avoid animation lag (matrix traversals on every frame)
+        frameCounterRef.current = (frameCounterRef.current || 0) + 1;
+        if (frameCounterRef.current >= 15) {
+          frameCounterRef.current = 0;
+          
+          const latestCube = useCubeStore.getState().cubeRef;
+          const latestScramble = useCubeStore.getState().currentScramble;
+          const solveMovesCount = useCubeStore.getState().solveMovesCount;
+          if (elapsed > 500 && solveMovesCount > 0 && latestCube?.isSolved()) {
+            const finalElapsed = performance.now() - startTimeRef.current;
+            setIsRunning(false);
+            const solveData = {
+              id: Math.random().toString(),
+              timeMs: finalElapsed,
+              date: new Date(),
+              scramble: latestScramble
+            };
+            setSolves(prev => [solveData, ...prev]);
+            saveSolveToFirebase(finalElapsed, latestScramble);
 
-          latestCube.reset();
-          setTimeout(() => {
-            useCubeStore.getState().setCurrentScramble(latestCube.scramble());
-          }, 1000);
-          return;
+            latestCube.reset();
+            setTimeout(() => {
+              useCubeStore.getState().setCurrentScramble(latestCube.scramble());
+            }, 1000);
+            return;
+          }
         }
         
         reqRef.current = requestAnimationFrame(update);
@@ -149,7 +156,7 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
         e.preventDefault();
         if (isRunning) {
           const elapsedTime = performance.now() - startTimeRef.current;
-          if (elapsedTime < 500) return;
+          if (elapsedTime < 10) return;
           
           setIsRunning(false);
           cancelAnimationFrame(reqRef.current);
@@ -168,10 +175,9 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
           setIsReady(true);
           finalTimeRef.current = 0;
           if (timerTextRef.current) timerTextRef.current.innerText = formatTime(0);
-          if (cubeRef) cubeRef.reset(); // snap to ready
         }
-      } else if (!isRunning && !isReady) {
-        // Cube rotation controls (if not solving)
+      } else if (!isReady) {
+        // Cube rotation controls (allowed anytime not holding Spacebar)
         if (!cubeRef) return;
         const key = e.key;
         const moveMap: Record<string, string> = {
@@ -193,6 +199,7 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
       if (e.code === 'Space' && isReady) {
         e.preventDefault();
         setIsReady(false);
+        useCubeStore.getState().resetSolveMovesCount();
         startTimeRef.current = performance.now();
         setIsRunning(true);
       }
@@ -237,28 +244,25 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
   const ao5 = solves.length >= 5 ? solves.slice(0, 5).reduce((a, b) => a + b.timeMs, 0) / 5 : 0;
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row gap-6 p-6 md:p-12 lg:p-16 z-10 pointer-events-none relative">
+    <div className="w-full relative pointer-events-none flex flex-col lg:flex-row items-center lg:items-stretch justify-between p-4 md:p-8 pb-12 gap-8 min-h-[450px]">
       
-      {/* Current Scramble Display */}
-      <AnimatePresence>
-        {!isRunning && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }}
-            className="absolute top-10 left-1/2 -translate-x-1/2 text-center max-w-lg z-20 pointer-events-none"
-          >
-            <div className="text-[10px] text-white/40 uppercase tracking-[0.2em] mb-2">Current Scramble</div>
-            <div className="font-mono text-[#00D1FF] text-lg font-bold tracking-widest">{currentScramble || 'Generating...'}</div>
-          </motion.div>
+      {/* Minimalist Bottom Center Timer Area */}
+      <div className={`flex-1 flex flex-col items-center pointer-events-none z-20 relative lg:pr-12 py-8 transition-all duration-500 ${isRunning ? 'justify-end min-h-[380px] pb-4 md:pb-8' : 'justify-center min-h-[220px]'}`}>
+        {currentScramble && !isRunning && (
+          <div className="text-white/40 font-mono text-[10px] md:text-xs uppercase tracking-[0.25em] max-w-md text-center mb-6 leading-relaxed bg-white/5 border border-white/10 px-4 py-2 rounded-xl backdrop-blur-sm pointer-events-auto">
+            <span className="text-white/20 font-bold block mb-1 text-[9px] tracking-[0.3em]">Scramble Sequence</span>
+            <span className="text-[#00D1FF] font-medium">{currentScramble}</span>
+          </div>
         )}
-      </AnimatePresence>
-
-      {/* Minimalist Bottom Center Timer */}
-      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-20">
         <div 
           ref={timerTextRef}
-          className={`font-mono text-5xl md:text-6xl font-bold tracking-tighter transition-colors duration-300 ${isReady ? 'text-[#00FF88] drop-shadow-[0_0_15px_rgba(0,255,136,0.5)]' : 'text-white'}`}
+          className={`font-mono font-bold tracking-tighter transition-all duration-500 ${
+            isRunning 
+              ? 'text-4xl md:text-5xl text-white/30 drop-shadow-[0_0_10px_rgba(255,255,255,0.05)]' 
+              : isReady 
+                ? 'text-6xl md:text-7xl lg:text-8xl text-[#00FF88] drop-shadow-[0_0_20px_rgba(0,255,136,0.5)]' 
+                : 'text-6xl md:text-7xl lg:text-8xl text-white'
+          }`}
         >
           {formatTime(finalTimeRef.current)}
         </div>
@@ -269,56 +273,56 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0, transition: { duration: 0.3 } }}
-              className="text-white/40 uppercase tracking-[0.3em] text-[10px] mt-4 font-semibold text-center"
+              className="text-white/40 uppercase tracking-[0.3em] text-[10px] md:text-[11px] mt-6 font-semibold text-center"
             >
               Hold Spacebar to Ready
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
-      {/* Hint Button when running */}
-      <AnimatePresence>
-        {isRunning && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="absolute left-10 bottom-10 z-20 pointer-events-auto"
-          >
-            <button 
-              onClick={() => {
-                useCubeStore.getState().addScore(-5);
-                addAchievement('Needed Help', 'Used a hint during a solve.');
-              }}
-              className="px-6 py-3 bg-[#FF00D1]/20 hover:bg-[#FF00D1]/40 border border-[#FF00D1]/50 rounded-full text-white font-bold tracking-widest uppercase text-xs transition-colors backdrop-blur-md flex items-center gap-2"
+        {/* Hint Button when running */}
+        <AnimatePresence>
+          {isRunning && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mt-8 pointer-events-auto"
             >
-              <span>Hint / Assist</span>
-              <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded">-5 pts</span>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <button 
+                onClick={() => {
+                  useCubeStore.getState().addScore(-5);
+                  addAchievement('Needed Help', 'Used a hint during a solve.');
+                }}
+                className="px-6 py-3 bg-[#FF00D1]/20 hover:bg-[#FF00D1]/40 border border-[#FF00D1]/50 rounded-full text-white font-bold tracking-widest uppercase text-xs transition-colors backdrop-blur-md flex items-center gap-2 cursor-pointer"
+              >
+                <span>Hint / Assist</span>
+                <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded">-5 pts</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
       
       {/* Right sidebar: Recent Solves & Leaderboard */}
-      <div className={`w-full md:w-80 h-[80%] glass-panel rounded-2xl p-6 flex flex-col mt-4 md:mt-0 transition-all duration-700 absolute right-6 md:right-12 lg:right-16 top-1/2 -translate-y-1/2 pointer-events-auto ${isRunning ? 'opacity-0 translate-x-10 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
+      <div className={`w-full lg:w-80 max-h-[480px] lg:max-h-[550px] glass-panel rounded-2xl p-6 flex flex-col pointer-events-auto transition-all duration-700 ${isRunning ? 'opacity-0 translate-y-10 lg:translate-x-10 pointer-events-none' : 'opacity-100 translate-y-0 lg:translate-x-0'}`}>
         
         <div className="flex gap-4 mb-6 border-b border-white/10 pb-2">
           <button 
             onClick={() => setSidebarTab('session')}
-            className={`text-[10px] uppercase tracking-[0.2em] transition-colors ${sidebarTab === 'session' ? 'text-white font-bold' : 'text-white/40 hover:text-white/60'}`}
+            className={`text-[10px] uppercase tracking-[0.2em] transition-colors ${sidebarTab === 'session' ? 'text-white font-bold' : 'text-white/40 hover:text-white/60'} cursor-pointer`}
           >
             Session
           </button>
           <button 
             onClick={() => setSidebarTab('global')}
-            className={`text-[10px] uppercase tracking-[0.2em] transition-colors ${sidebarTab === 'global' ? 'text-white font-bold' : 'text-white/40 hover:text-white/60'}`}
+            className={`text-[10px] uppercase tracking-[0.2em] transition-colors ${sidebarTab === 'global' ? 'text-white font-bold' : 'text-white/40 hover:text-white/60'} cursor-pointer`}
           >
             Global
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide min-h-[150px]">
           {sidebarTab === 'session' ? (
             <>
               {solves.map((solve, i) => (
@@ -366,54 +370,16 @@ export function Nexus({ solves, setSolves, isRunning, setIsRunning }: {
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
-          {!user && (
+        {!user && (
+          <div className="mt-4 pt-4 border-t border-white/10">
             <button
               onClick={handleSignIn}
-              className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white font-bold tracking-widest uppercase text-[10px] transition-colors"
+              className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white font-bold tracking-widest uppercase text-[10px] transition-colors cursor-pointer"
             >
               Sign in for Global Stats
             </button>
-          )}
-          
-          <button
-            onClick={async () => {
-              const btn = document.getElementById('coach-btn');
-              if (btn) btn.innerText = 'Thinking...';
-              try {
-                const historyText = solves.slice(0, 5).map(s => (s.timeMs / 1000).toFixed(2) + "s").join(", ");
-                const prompt = `You are a supportive speedcubing coach. The user's last 5 solves are: ${historyText || 'none yet'}. Give a single short sentence of advice or encouragement.`;
-                
-                const chatRes = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
-                });
-                const { text } = await chatRes.json();
-                
-                if (btn) btn.innerText = 'Speaking...';
-                const ttsRes = await fetch('/api/tts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text })
-                });
-                
-                const blob = await ttsRes.blob();
-                const url = URL.createObjectURL(blob);
-                const audio = new Audio(url);
-                audio.onended = () => { if (btn) btn.innerText = 'AI Coach'; };
-                audio.play();
-              } catch (e) {
-                console.error(e);
-                if (btn) btn.innerText = 'AI Coach';
-              }
-            }}
-            id="coach-btn"
-            className="w-full py-3 bg-[#00D1FF]/20 hover:bg-[#00D1FF]/40 border border-[#00D1FF]/50 rounded-lg text-[#00D1FF] font-bold tracking-widest uppercase text-xs transition-colors backdrop-blur-md"
-          >
-            AI Coach
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

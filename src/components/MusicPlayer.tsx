@@ -1,12 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Music, Play, Pause, RefreshCw, Volume2, VolumeX, Music2 } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Play, Pause, RefreshCw, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useCubeStore } from '../store';
 
 export function MusicPlayer() {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const isPlaying = useCubeStore(s => s.isMusicPlaying);
+  const setIsPlaying = useCubeStore(s => s.setIsMusicPlaying);
+  const isLoading = useCubeStore(s => s.isMusicLoading);
+  const setIsLoading = useCubeStore(s => s.setIsMusicLoading);
+  const audioUrl = useCubeStore(s => s.musicAudioUrl);
+  const setAudioUrl = useCubeStore(s => s.setMusicAudioUrl);
+  
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const generateMusic = async () => {
@@ -17,9 +21,7 @@ export function MusicPlayer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'Relaxing lofi hip hop beats for speedcubing focus, chill vibes' }),
       });
-
       if (!response.ok) throw new Error('Failed to generate music');
-
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
@@ -33,7 +35,7 @@ export function MusicPlayer() {
 
   useEffect(() => {
     if (audioRef.current) {
-      if (isPlaying) {
+      if (isPlaying && audioUrl) {
         audioRef.current.play().catch(console.error);
       } else {
         audioRef.current.pause();
@@ -51,7 +53,7 @@ export function MusicPlayer() {
 
   return (
     <div className="fixed bottom-6 right-6 z-[100] pointer-events-auto">
-      <div className="flex items-center gap-2 glass-panel p-2 rounded-2xl border border-white/10 shadow-2xl">
+      <div className="flex items-center gap-2 glass-panel-apple p-2 rounded-2xl transition-all duration-500 hover:scale-105 shadow-[0_4px_30px_rgba(0,0,0,0.4)] border border-white/10 btn-shimmer">
         <AnimatePresence mode="wait">
           {audioUrl && (
             <motion.div
@@ -61,8 +63,8 @@ export function MusicPlayer() {
               className="flex items-center gap-3 px-3 overflow-hidden"
             >
               <div className="flex flex-col">
-                <span className="text-[8px] uppercase tracking-widest text-[#00FF88] font-bold">Lofi Channel</span>
-                <span className="text-[10px] text-white/70 whitespace-nowrap">Neural Beats Alpha</span>
+                <span className="text-[9px] font-bold tracking-widest text-white/50 uppercase">Lofi Beats</span>
+                <span className="text-[10px] font-medium text-[#00D1FF] calligraphy truncate max-w-[80px]">Active Track</span>
               </div>
               
               <div className="flex items-center gap-1">
@@ -78,7 +80,7 @@ export function MusicPlayer() {
                       delay: i * 0.1,
                       ease: "easeInOut"
                     }}
-                    className="w-1 bg-[#00FF88]/60 rounded-full"
+                    className="w-1 bg-[#00D1FF] rounded-full"
                   />
                 ))}
               </div>
@@ -88,12 +90,16 @@ export function MusicPlayer() {
 
         <div className="flex items-center gap-1">
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={togglePlay}
             disabled={isLoading}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-              isLoading ? 'bg-white/5' : audioUrl && isPlaying ? 'bg-[#00FF88]/20 text-[#00FF88]' : 'bg-white/10 text-white hover:bg-white/20'
+            className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 ${
+              isLoading 
+                ? 'bg-white/5' 
+                : audioUrl && isPlaying 
+                  ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]' 
+                  : 'bg-white/10 text-white hover:bg-white/20 hover:text-[#00D1FF]'
             }`}
           >
             {isLoading ? (
@@ -101,19 +107,19 @@ export function MusicPlayer() {
             ) : isPlaying ? (
               <Pause size={18} />
             ) : (
-              <Play size={18} className="translate-x-0.5" />
+              <Play size={18} className="translate-x-0.5 text-[#00D1FF]" />
             )}
           </motion.button>
-
+          
           {audioUrl && (
             <motion.button
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={generateMusic}
               disabled={isLoading}
-              className="w-10 h-10 rounded-xl bg-white/5 text-white/40 hover:bg-white/10 hover:text-white flex items-center justify-center transition-all"
+              className="w-10 h-10 rounded-[14px] bg-white/5 text-white/40 hover:bg-white/10 hover:text-white flex items-center justify-center transition-all duration-300"
               title="Regenerate Track"
             >
               <RefreshCw size={16} />
@@ -121,13 +127,12 @@ export function MusicPlayer() {
           )}
         </div>
       </div>
-
+      
       {audioUrl && (
         <audio
           ref={audioRef}
           src={audioUrl}
           loop
-          muted={isMuted}
           onEnded={() => setIsPlaying(false)}
         />
       )}

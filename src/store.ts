@@ -11,6 +11,15 @@ interface CubeState {
   addScore: (points: number) => void;
   currentScramble: string;
   setCurrentScramble: (scramble: string) => void;
+  solveMovesCount: number;
+  incrementSolveMovesCount: () => void;
+  resetSolveMovesCount: () => void;
+  isMusicPlaying: boolean;
+  setIsMusicPlaying: (playing: boolean) => void;
+  isMusicLoading: boolean;
+  setIsMusicLoading: (loading: boolean) => void;
+  musicAudioUrl: string | null;
+  setMusicAudioUrl: (url: string | null) => void;
 }
 
 export const useCubeStore = create<CubeState>((set) => ({
@@ -30,4 +39,13 @@ export const useCubeStore = create<CubeState>((set) => ({
   addScore: (points) => set((state) => ({ score: Math.max(0, state.score + points) })),
   currentScramble: '',
   setCurrentScramble: (scramble) => set({ currentScramble: scramble }),
+  solveMovesCount: 0,
+  incrementSolveMovesCount: () => set((state) => ({ solveMovesCount: state.solveMovesCount + 1 })),
+  resetSolveMovesCount: () => set({ solveMovesCount: 0 }),
+  isMusicPlaying: false,
+  setIsMusicPlaying: (playing) => set({ isMusicPlaying: playing }),
+  isMusicLoading: false,
+  setIsMusicLoading: (loading) => set({ isMusicLoading: loading }),
+  musicAudioUrl: null,
+  setMusicAudioUrl: (url) => set({ musicAudioUrl: url }),
 }));
