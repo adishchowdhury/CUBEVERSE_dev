@@ -1,4 +1,4 @@
-## Live deployment- 
+## Live deployment- https://cubeverse-dev.vercel.app/
 
 ## Run Locally
 
