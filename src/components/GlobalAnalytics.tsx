@@ -100,9 +100,6 @@ export function GlobalAnalytics() {
       </div>
 
       <div className="mt-6 flex items-center justify-between pt-6 border-t border-white/5">
-        <p className="text-[10px] text-white/30 max-w-md">
-          Leveraging Snowflake Snowpark for distributed processing of massive cubing datasets. Real-time neural aggregation for peak performance modeling.
-        </p>
         <button className="text-[10px] text-blue-400 hover:text-blue-300 font-medium transition-colors">
           View Raw Dataset →
         </button>
